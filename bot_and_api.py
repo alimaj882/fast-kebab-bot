@@ -6,9 +6,9 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
-import telegram # <--- أضفنا هذا لمعالجة الأخطاء
+import telegram
 
-# ⚠️ تأكد من وضع التوكن الخاص بك هنا
+# ⚠️ ضع التوكن الخاص بك هنا
 TOKEN = '8804131470:AAGyfcSlTrfhdlyiMQ3vdKMqBNDXegPHeyg'
 
 # ==========================================
@@ -120,7 +120,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(text="📝 Introduceți **Numele**:\nВведите **Имя**:", parse_mode='Markdown')
             
     except telegram.error.BadRequest as e:
-        # إذا حاول المستخدم الضغط على نفس الزر مرتين، سيتجاهل البوت الخطأ ولن يتوقف
         if "Message is not modified" in str(e):
             pass 
         else:
@@ -182,6 +181,21 @@ def get_orders():
                 if line.strip():
                     orders.append(json.loads(line))
     return jsonify(orders)
+
+@app.route('/delete_order/<int:order_id>', methods=['DELETE'])
+def delete_order(order_id):
+    orders_file = 'orders.json'
+    if os.path.exists(orders_file):
+        with open(orders_file, 'r', encoding='utf-8') as f:
+            orders = [json.loads(line) for line in f if line.strip()]
+        
+        updated_orders = [o for o in orders if o.get('id') != order_id]
+        
+        with open(orders_file, 'w', encoding='utf-8') as f:
+            for o in updated_orders:
+                f.write(json.dumps(o, ensure_ascii=False) + "\n")
+        return jsonify({"status": "success"}), 200
+    return jsonify({"status": "not found"}), 404
 
 # ==========================================
 # 4. تشغيل البوت والخادم معاً
