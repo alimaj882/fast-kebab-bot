@@ -6,8 +6,9 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+import telegram # <--- أضفنا هذا لمعالجة الأخطاء
 
-# ⚠️ ضع التوكن الخاص بك هنا
+# ⚠️ تأكد من وضع التوكن الخاص بك هنا
 TOKEN = '8804131470:AAGyfcSlTrfhdlyiMQ3vdKMqBNDXegPHeyg'
 
 # ==========================================
@@ -68,54 +69,62 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     if 'cart' not in context.user_data: context.user_data['cart'] = {}
 
-    if data.startswith("cat_"):
-        category_name = data.replace("cat_", "")
-        products = MENU.get(category_name, {})
-        keyboard = [[InlineKeyboardButton(f"{p_name} - {p_price} MDL", callback_data=f"add_{category_name}|{p_name}")] for p_name, p_price in products.items()]
-        keyboard.append([InlineKeyboardButton("🔙 Înapoi / Назад", callback_data="back_to_menu")])
-        await query.edit_message_text(text=f"📋 **{category_name}**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+    try:
+        if data.startswith("cat_"):
+            category_name = data.replace("cat_", "")
+            products = MENU.get(category_name, {})
+            keyboard = [[InlineKeyboardButton(f"{p_name} - {p_price} MDL", callback_data=f"add_{category_name}|{p_name}")] for p_name, p_price in products.items()]
+            keyboard.append([InlineKeyboardButton("🔙 Înapoi / Назад", callback_data="back_to_menu")])
+            await query.edit_message_text(text=f"📋 **{category_name}**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
-    elif data == "back_to_menu":
-        await query.edit_message_text(text="Alegeți o categorie:", reply_markup=get_main_menu_keyboard())
+        elif data == "back_to_menu":
+            await query.edit_message_text(text="Alegeți o categorie:", reply_markup=get_main_menu_keyboard())
 
-    elif data.startswith("add_"):
-        _, item_data = data.split("_", 1)
-        category, product_name = item_data.split("|", 1)
-        price = MENU[category][product_name]
-        cart = context.user_data['cart']
-        if product_name in cart: cart[product_name]['qty'] += 1
-        else: cart[product_name] = {'price': price, 'qty': 1}
-        await query.answer(f"✅ Adăugat: {product_name}")
-        
-        keyboard = [[InlineKeyboardButton(f"{p_name} - {p_price} MDL", callback_data=f"add_{category}|{p_name}")] for p_name, p_price in MENU[category].items()]
-        keyboard.append([InlineKeyboardButton("🛒 Vezi Coșul / Корзина", callback_data="view_cart")])
-        keyboard.append([InlineKeyboardButton("🔙 Înapoi / Назад", callback_data="back_to_menu")])
-        await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
+        elif data.startswith("add_"):
+            _, item_data = data.split("_", 1)
+            category, product_name = item_data.split("|", 1)
+            price = MENU[category][product_name]
+            cart = context.user_data['cart']
+            if product_name in cart: cart[product_name]['qty'] += 1
+            else: cart[product_name] = {'price': price, 'qty': 1}
+            await query.answer(f"✅ Adăugat: {product_name}")
+            
+            keyboard = [[InlineKeyboardButton(f"{p_name} - {p_price} MDL", callback_data=f"add_{category}|{p_name}")] for p_name, p_price in MENU[category].items()]
+            keyboard.append([InlineKeyboardButton("🛒 Vezi Coșul / Корзина", callback_data="view_cart")])
+            keyboard.append([InlineKeyboardButton("🔙 Înapoi / Назад", callback_data="back_to_menu")])
+            await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif data == "view_cart":
-        cart = context.user_data['cart']
-        if not cart:
-            await query.answer("Coșul este gol!", show_alert=True)
-            return
-        text = "🛒 **Coșul tău:**\n\n"
-        for name, item in cart.items(): text += f"▪️ {item['qty']}x {name} = {item['price'] * item['qty']} MDL\n"
-        total = get_cart_total(cart)
-        text += f"\n💰 **Total: {total} MDL**"
-        keyboard = [
-            [InlineKeyboardButton("✅ Finalizează / Оформить", callback_data="checkout")],
-            [InlineKeyboardButton("🗑 Golește / Очистить", callback_data="clear_cart")],
-            [InlineKeyboardButton("🔙 Înapoi / В меню", callback_data="back_to_menu")]
-        ]
-        await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
+        elif data == "view_cart":
+            cart = context.user_data['cart']
+            if not cart:
+                await query.answer("Coșul este gol!", show_alert=True)
+                return
+            text = "🛒 **Coșul tău:**\n\n"
+            for name, item in cart.items(): text += f"▪️ {item['qty']}x {name} = {item['price'] * item['qty']} MDL\n"
+            total = get_cart_total(cart)
+            text += f"\n💰 **Total: {total} MDL**"
+            keyboard = [
+                [InlineKeyboardButton("✅ Finalizează / Оформить", callback_data="checkout")],
+                [InlineKeyboardButton("🗑 Golește / Очистить", callback_data="clear_cart")],
+                [InlineKeyboardButton("🔙 Înapoi / В меню", callback_data="back_to_menu")]
+            ]
+            await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
-    elif data == "clear_cart":
-        context.user_data['cart'] = {}
-        await query.answer("🗑 Coșul a fost golit!")
-        await query.edit_message_text("Alegeți o categorie:", reply_markup=get_main_menu_keyboard())
+        elif data == "clear_cart":
+            context.user_data['cart'] = {}
+            await query.answer("🗑 Coșul a fost golit!")
+            await query.edit_message_text("Alegeți o categorie:", reply_markup=get_main_menu_keyboard())
 
-    elif data == "checkout":
-        context.user_data['state'] = "WAITING_NAME"
-        await query.edit_message_text(text="📝 Introduceți **Numele**:\nВведите **Имя**:", parse_mode='Markdown')
+        elif data == "checkout":
+            context.user_data['state'] = "WAITING_NAME"
+            await query.edit_message_text(text="📝 Introduceți **Numele**:\nВведите **Имя**:", parse_mode='Markdown')
+            
+    except telegram.error.BadRequest as e:
+        # إذا حاول المستخدم الضغط على نفس الزر مرتين، سيتجاهل البوت الخطأ ولن يتوقف
+        if "Message is not modified" in str(e):
+            pass 
+        else:
+            print(f"Telegram Error: {e}")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     state = context.user_data.get('state')
@@ -153,6 +162,8 @@ def run_bot():
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    print("Starting Telegram Bot...")
     application.run_polling()
 
 # ==========================================
@@ -180,8 +191,5 @@ def run_flask():
     app.run(host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
-    # تشغيل Flask في الخلفية
     threading.Thread(target=run_flask, daemon=True).start()
-    # تشغيل البوت في الخيط الرئيسي
-    print("Starting Telegram Bot...")
     run_bot()
