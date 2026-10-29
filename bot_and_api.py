@@ -172,9 +172,9 @@ def get_orders():
                     orders.append(json.loads(line))
     return jsonify(orders)
 
-# تشغيل البوت في الخلفية والخادم في المقدمة
-if __name__ == '__main__':
-    # تشغيل خادم Flask في الخلفية (Thread)
+# ==========================================
+# 4. تشغيل البوت والخادم معاً
+# ==========================================
 def run_flask():
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
@@ -182,6 +182,6 @@ def run_flask():
 if __name__ == '__main__':
     # تشغيل Flask في الخلفية
     threading.Thread(target=run_flask, daemon=True).start()
-    # تشغيل البوت في الخيط الرئيسي (لحل مشكلة Python 3.14)
+    # تشغيل البوت في الخيط الرئيسي
     print("Starting Telegram Bot...")
     run_bot()
